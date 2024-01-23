@@ -400,16 +400,6 @@
               <FilePath>.\ADC.c</FilePath>
             </File>
             <File>
-              <FileName>led.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\led.c</FilePath>
-            </File>
-            <File>
-              <FileName>lcd1602.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\lcd1602.c</FilePath>
-            </File>
-            <File>
               <FileName>uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\uart.c</FilePath>
@@ -450,21 +440,6 @@
               <FilePath>.\ADC.h</FilePath>
             </File>
             <File>
-              <FileName>main.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\main.h</FilePath>
-            </File>
-            <File>
-              <FileName>led.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\led.h</FilePath>
-            </File>
-            <File>
-              <FileName>lcd1602.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\lcd1602.h</FilePath>
-            </File>
-            <File>
               <FileName>uart.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\uart.h</FilePath>
@@ -483,51 +458,6 @@
               <FileName>functions.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\functions.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>test</GroupName>
-          <Files>
-            <File>
-              <FileName>adc_done.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\adc_done.txt</FilePath>
-            </File>
-            <File>
-              <FileName>acc_done.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\acc_done.txt</FilePath>
-            </File>
-            <File>
-              <FileName>fun.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\fun.txt</FilePath>
-            </File>
-            <File>
-              <FileName>test1.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\test1.txt</FilePath>
-            </File>
-            <File>
-              <FileName>acc_done_2.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\acc_done_2.txt</FilePath>
-            </File>
-            <File>
-              <FileName>test2.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\test2.txt</FilePath>
-            </File>
-            <File>
-              <FileName>working1.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\working1.txt</FilePath>
-            </File>
-            <File>
-              <FileName>half_working.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\half_working.txt</FilePath>
             </File>
           </Files>
         </Group>

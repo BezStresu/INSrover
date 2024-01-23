@@ -2,8 +2,6 @@
 ".\objects\main.o"
 ".\objects\pit.o"
 ".\objects\adc.o"
-".\objects\led.o"
-".\objects\lcd1602.o"
 ".\objects\uart.o"
 ".\objects\i2c.o"
 ".\objects\control.o"

@@ -1,0 +1,204 @@
+/******************************************************************************
+ * This file is a part of the MMA Demo (C).                                   *
+ ******************************************************************************/
+
+/**
+ * @file main.c
+ * @author Koryciak
+ * @date Nov 2020 
+ * @brief File containing the main function. 
+ * @ver 0.7
+ */
+ 
+#include "frdm_bsp.h" 
+#include "led.h" 
+#include "uart.h" 
+#include "stdio.h"
+#include "i2c.h"
+#include "pit.h"
+#include "ADC.h"
+
+void SysTick_Handler(void);
+void bus_scan (void);
+void expander_looptest (uint8_t address);
+
+static uint8_t msTicks = 0;
+static uint8_t newTick = 0;
+static char temp[99];
+static uint8_t readout = 0;
+static uint8_t arrayXYZ[6];
+
+uint8_t result_adc0_ok = 0;
+uint8_t result_light_ok = 0;
+uint8_t result_temp_ok = 0;
+
+uint16_t count_light = 0;
+uint16_t count_temp = 0;
+
+float	m = 162;		// /100
+float u25 = 716;
+float T;
+float L;
+float s25 = 25;
+
+uint16_t temp1;	// temporary
+float	adc0_light;
+float	adc0_temp;
+float coeff = ((float)(((float)2.91) / 4095) );	// 2.91[V] to napiecie referencyjne przetwornika, 4095 to jego rozdzielczosc
+// Do przemyslenia: Obsluge przerwania adc przeniesc do plików adc
+
+double temp2;
+double ga_earth = 9.81;
+double ga_mars = 3.70;
+double ga_moon = 1.62;
+double ga_venus = 8.90;
+
+
+void ADC0_IRQHandler()
+{	
+	temp1 = ADC0->R[0];		// Odczyt danej i skasowanie flagi COCO
+	if(!result_adc0_ok)					// Sprawdz, czy wynik skonsumowany przez petle glówna
+	{
+		if(result_temp_ok)
+		{
+			adc0_light = temp1;				// Wyslij nowa dana do petli glównej
+			count_light++;
+		}
+		else if(result_light_ok)
+		{
+			adc0_temp = temp1;
+			count_temp++;
+		}
+		result_adc0_ok = 1;
+	}
+	NVIC_ClearPendingIRQ(ADC0_IRQn);
+}
+
+
+int main (void) { 
+	PIT_Init();
+	uint8_t	kal_error;
+	kal_error = ADC_Init();		// Inicjalizacja i kalibracja przetwornika A/C
+	if(kal_error)
+	{
+		// ToDo: Dodac funkcje ktora w przypadku wadliwej kalibracji robi to jeszcze kilka razy a w przypadku niepowodzenia informuje o tym
+		while(1){							// Klaibracja sie nie powiodla
+		}
+	}
+	
+	ADC0->SC1[0] = ADC_SC1_AIEN_MASK | ADC_SC1_ADCH(0);		// Odblokowanie przerwania i wybranie kanalu nr 0
+	result_light_ok = 1;			// wybranie pierwszego pomiaru jako pomiar natezenia swiatla
+	SysTick_Config(500000); 								/* initialize system timer */
+	LED_Init ();	 													/* initialize all LEDs */ 
+	LED_Welcome();  												/* blink with all LEDs */
+	
+	I2C_Init();	
+	UART_Init(9600);												/* initialize UART */ 
+	UART_Println("\n\r### Microprocessor Technology 2 - I2C tutorial ###");														/* initialize I2C */
+  UART_Println("\n-> List of connected to I2C bus devices:");
+  bus_scan();															/* check what is connected */
+	UART_Println("\n-> Loopback test with PCF8574:");
+	expander_looptest(0x3F);
+	I2C_Write(0x3F, 0x8);
+	UART_Println("\n-> First contact with MMA8451.");
+	I2C_ReadReg (0x1D, 0x3B, &readout);
+	sprintf(temp, "MMA8451 device ID: 0x%02X", readout);
+	UART_Println(temp);
+	UART_Println("\n-> MMA8451 first measurement.");
+	I2C_WriteReg(0x1D, 0x2A, 0x1);	 		// Set ACTIVE bit in CTRL_REG1 in MMA8451
+	I2C_ReadReg (0x1D, 0x05, &readout); // Get OUT_Z_MSB from MMA8451 (MSB 8 bits from 14 in total)
+	sprintf(temp,"Gravity: %+1.2fg", ((double)((int16_t)(readout<<8)>>2)/4096)); // default 4096 counts/g sensitivity
+	UART_Println(temp);
+	UART_Println("\n-> MMA8451 full data.");
+	I2C_ReadRegBlock(0x1D, 0x01, 8, arrayXYZ);
+	UART_Println("\n-> Starting the main loop. Sleep ...\n\r");
+
+	while(1) {
+		if(result_adc0_ok && result_light_ok && !result_temp_ok)
+		{
+			ADC0->SC1[0] = ADC_SC1_AIEN_MASK | ADC_SC1_ADCH(0);
+			adc0_light = adc0_light*coeff* 500;		// Dostosowanie wyniku do zakresu napieciowego, wynik w luxach, obliczenia w notesie
+			
+			result_adc0_ok = 0;
+			result_light_ok = 0;
+			result_temp_ok = 1;
+		}
+		else if(result_adc0_ok && result_temp_ok && !result_light_ok)
+		{
+			ADC0->SC1[0] = ADC_SC1_AIEN_MASK | ADC_SC1_ADCH(26);
+			T = s25 - ((float)adc0_temp- u25)/m;		// temperatura w stopniach celcjusza
+			result_adc0_ok = 0;
+			result_temp_ok = 0;
+			result_light_ok = 1;
+		}
+		__WFI();															/* sleep & wait for interrupt */
+
+		// simple schedule
+		if (newTick) {
+			newTick = 0;												/* clear flag & choose task */
+			// task 1 - heartbeat
+			if( msTicks%20 == 0 ) {
+				LED_Ctrl(HEART_BEAT, LED_TOGGLE);
+			}
+			// task 2
+			if( msTicks%50 == 0) {
+
+					I2C_ReadRegBlock(0x1D, 0x01, 8, arrayXYZ);
+				
+//					The sensitivity is represented in counts/g. In 2g mode the sensitivity is 4096 counts/g. In 4g mode the sensitivity is 2048 counts/
+//					g and in 8g mode the sensitivity is 1024 counts/g, from dataheet
+				
+					temp2 = ((double)((int16_t)((arrayXYZ[0]<<8)|arrayXYZ[1])>>2)/4096);
+					sprintf(temp,"Left/Right: %+1.6fg", temp2); // default 4096 counts/g sensitivity
+					UART_Println(temp);
+					
+					temp2 = ((double)((int16_t)((arrayXYZ[2]<<8)|arrayXYZ[3])>>2)/4096);
+					sprintf(temp,"Foward/Backward: %+1.6fg", temp2); // default 4096 counts/g sensitivity
+					UART_Println(temp);
+					temp2 = ((double)((int16_t)((arrayXYZ[4]<<8)|arrayXYZ[5])>>2)/4096) * ga_earth;
+					sprintf(temp,"Gravity: %+1.6fg", temp2); // default 4096 counts/g sensitivity
+					UART_Println(temp);
+					//UART_Println("\n");
+					sprintf(temp,"Light: %f Lux", adc0_light);
+					UART_Println(temp);
+					sprintf(temp,"Temperature: %f Celcius", T);
+					UART_Println(temp);
+			}
+		}
+	} /* end_while */
+}
+/**
+ * @brief System time update. 
+ */
+void SysTick_Handler(void) {
+	msTicks++;
+	newTick = 1;
+}
+/**
+ * @brief Simple bus (I2C) scan. Print via UART present devices. 
+ */
+void bus_scan (void) {
+	
+	uint8_t idx = 1;
+	
+	for(uint8_t address=1; address<128; address++) {
+		if( (I2C_Ping(address) & I2C_ERR_NOACK) == 0 ) { // Send address and check ACK from slave
+			sprintf(temp, "%d. Device address: 0x%02X", idx++, address);
+			UART_Println(temp);
+		}
+	}
+}
+/**
+ * @brief Loop test with Read/Write operations of I/O expander. 
+ */
+void expander_looptest (uint8_t address) {
+	
+	uint8_t idx = 1;
+	
+	for(uint8_t data=2; data<7; data++) {
+		I2C_Write(address, data);													// Write data to address
+		I2C_Read (address, &readout);											// Read address to readout
+		sprintf(temp, "Test %02d - Write: 0x%02X Read: 0x%02X", idx++, data,readout);
+		UART_Println(temp);
+	}	
+}

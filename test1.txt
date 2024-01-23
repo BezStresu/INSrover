@@ -1,0 +1,116 @@
+#include "frdm_bsp.h" 
+#include "led.h" 
+#include "uart.h" 
+#include "stdio.h"
+#include "i2c.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+static uint8_t msTicks = 0;
+static uint8_t newTick = 0;
+static char temp[99];
+static uint8_t readout = 0;
+static uint8_t arrayXYZ[6];
+
+
+void SysTick_Handler(void);
+void bus_scan (void);
+void expander_looptest (uint8_t address);
+
+void rozpoznajKomendy(char *komendy) {
+    const char delimiters[] = " ,";
+    char *token;
+
+    // Petla dziala dopóki w ciagu sa jeszcze slowa
+    while ((token = strtok(komendy, delimiters)) != NULL) {
+        // Sprawdza, czy slowo to forward, backward, right, left
+        if (strcmp(token, "forward") == 0) {
+            UART_Println("Wykryto komende: Forward\n");
+
+            // Jesli jest dostepne kolejne slowo, to jest traktowane jako wartosc
+            token = strtok(NULL, delimiters);
+            if (token != NULL) {
+                int value = atoi(token);
+							
+                UART_Println("Wartosc: %d\n", value);
+            }
+        } else if (strcmp(token, "backward") == 0) {
+            UART_Println("Wykryto komende: Backward\n");
+
+            // Jesli jest dostepne kolejne slowo, to jest traktowane jako wartosc
+            token = strtok(NULL, delimiters);
+            if (token != NULL) {
+                int value = atoi(token);
+                printf("Wartosc: %d\n", value);
+            }
+        } else if (strcmp(token, "right") == 0) {
+            UART_Println("Wykryto komende: Right\n");
+        } else if (strcmp(token, "left") == 0) {
+            UART_Println("Wykryto komende: Left\n");
+        }
+
+        // Usuwa przetworzone slowo z ciagu
+        memmove(komendy, komendy + strlen(token) + 1, strlen(komendy) - strlen(token));
+
+        // Pobiera kolejne slowo
+        token = strtok(NULL, delimiters);
+    }
+}
+
+
+int main(){
+	SysTick_Config(1000000); 								/* initialize system timer */
+	
+	LED_Init ();	 													/* initialize all LEDs */ 
+	LED_Welcome();  												/* blink with all LEDs */
+	
+	UART_Init(9600);												/* initialize UART */ 
+	UART_Println("\n\r### Microprocessor Technology 2 - I2C tutorial ###");
+
+	I2C_Init();															/* initialize I2C */
+	
+  UART_Println("\n-> List of connected to I2C bus devices:");
+  bus_scan();															/* check what is connected */
+	
+	char komendy[] = "forward50leftforward30rightbackward";
+    
+    // Petla dziala dopóki ciag nie jest pusty
+    while (strlen(komendy) > 0) {
+        rozpoznajKomendy(komendy);
+    }
+	
+}
+
+void SysTick_Handler(void) {
+	msTicks++;
+	newTick = 1;
+}
+/**
+ * @brief Simple bus (I2C) scan. Print via UART present devices. 
+ */
+void bus_scan (void) {
+	
+	uint8_t idx = 1;
+	
+	for(uint8_t address=1; address<128; address++) {
+		if( (I2C_Ping(address) & I2C_ERR_NOACK) == 0 ) { // Send address and check ACK from slave
+			sprintf(temp, "%d. Device address: 0x%02X", idx++, address);
+			UART_Println(temp);
+		}
+	}
+}
+/**
+ * @brief Loop test with Read/Write operations of I/O expander. 
+ */
+void expander_looptest (uint8_t address) {
+	uint8_t idx = 1;
+	for(uint8_t data=2; data<7; data++) {
+		I2C_Write(address, data);													// Write data to address
+		I2C_Read (address, &readout);											// Read address to readout
+		sprintf(temp, "Test %02d - Write: 0x%02X Read: 0x%02X", idx++, data,readout);
+		UART_Println(temp);
+	}	
+}
+	
